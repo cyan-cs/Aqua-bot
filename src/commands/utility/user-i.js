@@ -1,5 +1,6 @@
 const { GuildMember, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const logger = require('../../utils/logger.js');
+const { addMessageId } = require('../../utils/jsonStore'); // 追加
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -11,14 +12,16 @@ module.exports = {
                 .setRequired(true)
         ),
 
-    // 共通の処理
+    /**
+     * 共通のユーザー情報表示ロジック
+     * @param {GuildMember|import('discord.js').User} user 
+     * @param {(msg: any) => Promise<import('discord.js').Message>} replyMethod 
+     */
     async execute(user, replyMethod) {
         try {
-            // ユーザーオブジェクトを判別
             const targetUser = user instanceof GuildMember ? user.user : user;
             const member = user instanceof GuildMember ? user : null;
 
-            // フィールド情報を準備
             const fields = [
                 { name: 'ユーザー名', value: targetUser.username, inline: true },
                 { name: 'ユーザーID', value: targetUser.id, inline: true },
@@ -40,7 +43,6 @@ module.exports = {
                 );
             }
 
-            // エンベッドの作成
             const embed = new EmbedBuilder()
                 .setColor('#0099ff')
                 .setTitle(`${targetUser.tag} の情報`)
@@ -50,10 +52,14 @@ module.exports = {
 
             logger.info(`User information for ${targetUser.tag} successfully retrieved.`);
 
-            await replyMethod({ embeds: [embed] });
+            const sentMsg = await replyMethod({ embeds: [embed], fetchReply: true }); // 重要：fetchReply有効
+
+            await sentMsg.react('🗑️');
+            await addMessageId(sentMsg.id);
+
         } catch (error) {
-            console.error('Error in /user_i command:', error); // 詳細なエラー情報をコンソールに出力
-            logger.error('Error executing /user_i command:', error);
+            console.error('Error in /user-i command:', error);
+            logger.error('Error executing /user-i command:', error);
 
             const embed = new EmbedBuilder()
                 .setColor('#FF0000')
@@ -62,26 +68,34 @@ module.exports = {
                 .addFields({ name: '詳細', value: `\`${error.message}\`\n\`\`\`${error.stack}\`\`\`` })
                 .setTimestamp();
 
-            await replyMethod({ embeds: [embed] });
+            const errorMsg = await replyMethod({ embeds: [embed], fetchReply: true });
+            await errorMsg.react('🗑️');
+            await addMessageId(errorMsg.id);
         }
     },
 
-    // スラッシュコマンド用の実行
     async executeSlash(interaction) {
         const user = interaction.options.getMember('target') || interaction.options.getUser('target');
         await this.execute(user, (msg) => interaction.reply(msg));
     },
 
-    // メッセージコマンド用の実行
     async executeMessage(message, args) {
-        const userId = args[0]?.replace(/\D/g, ''); // ID 部分だけを抽出
-        if (!userId) return message.reply('ユーザーIDを指定してください。');
+        const userId = args[0]?.replace(/\D/g, '');
+        if (!userId) {
+            const errorMsg = await message.reply('ユーザーIDを指定してください。');
+            await errorMsg.react('🗑️');
+            await addMessageId(errorMsg.id);
+            return;
+        }
 
         let user = await message.guild.members.fetch(userId).catch(() => null) ||
                    await message.client.users.fetch(userId).catch(() => null);
 
         if (!user) {
-            return message.reply('指定されたユーザーが見つかりませんでした。');
+            const errorMsg = await message.reply('指定されたユーザーが見つかりませんでした。');
+            await errorMsg.react('🗑️');
+            await addMessageId(errorMsg.id);
+            return;
         }
 
         await this.execute(user, (msg) => message.reply(msg));
