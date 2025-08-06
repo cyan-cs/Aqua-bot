@@ -1,7 +1,7 @@
-# cyan-bot - しあんぼっと
+# Aqua - bot
 
 ## 1. 説明
-- **cyan-bot** は、便利な機能、娯楽、経済関連の機能が実装されたボットです。
+- **Aqua - bot** は、便利な機能、娯楽、経済関連の機能が実装されたボットです。
 - このリポジトリは **MIT** ライセンスで公開されています。
 - このコードの一部または全てを使用した場合、 [`©2025 cyan-cs`](https://github.com/cyan-cs),[`©2025 lazyfll`](https://github.com/lazyfll)とクレジットに載せる必要があります。
 
@@ -54,7 +54,7 @@
 - `money`-自分又は他人の残金を表示します。
 
 ## 4. インストール方法
-1. `git clone https://github.com/cyan-cs/DiscordBOT-cs` でこのリポジトリをクローンしてください。
+1. `git clone https://github.com/cyan-cs/Aqua-bot` でこのリポジトリをクローンしてください。
 2. このコードは`yarn install`で必要なパッケージをインストールできます。
 3. `.env.example`の名前を`.env`に変更し各項目に [Discord開発者ポータル](https://discord.com/developers/applications) で入手した情報を各項目に記述してください。
 4. `yarn start`で実行ができます。
