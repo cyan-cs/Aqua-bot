@@ -12,7 +12,7 @@
     "bot",
     "discord.js"
   ],
-  "author": "cyan-bot",
+  "author": "cyan-dev",
   "license": "GPL - 3.0",
   "dependencies": {
     "@discordjs/rest": "^2.4.3",
