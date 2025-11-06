@@ -1,13 +1,13 @@
-// src/events/loginStreak.js
 const db = require('../utils/database.js');
 const logger = require('../utils/logger.js');
 const { EmbedBuilder } = require('discord.js');
+const { addMessageId } = require('../utils/jsonStore.js');
 
 const LOGIN_TABLE = 'login_streaks';
 
 function formatDate(date) {
     const japanTime = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-    return japanTime.toISOString().split('T')[0]; // YYYY-MM-DD
+    return japanTime.toISOString().split('T')[0];
 }
 
 module.exports = {
@@ -42,7 +42,6 @@ module.exports = {
                 if (lastLoginStr === todayStr) return;
 
                 let newStreak = 1;
-
                 if (lastLoginStr) {
                     const lastDate = new Date(lastLoginStr);
                     const diffDays = Math.floor((new Date(todayStr) - lastDate) / (1000 * 60 * 60 * 24));
@@ -54,26 +53,30 @@ module.exports = {
                     VALUES (?, ?, ?)
                     ON CONFLICT(userId) DO UPDATE SET lastLogin = excluded.lastLogin, streak = excluded.streak
                 `;
+
                 db.run(upsertQuery, [userId, todayStr, newStreak], async (updateErr) => {
                     if (updateErr) {
                         return logger.error('LoginStreak 更新エラー:', updateErr);
                     }
 
                     const embed = new EmbedBuilder()
-                        .setTitle('📅 ログイン記録更新')
-                        .setDescription(`**${message.author.tag}** がログインしました！`)
+                        .setAuthor({
+                            name: message.author.tag,
+                            iconURL: message.author.displayAvatarURL({ dynamic: true })
+                        })
+                        .setTitle('ログイン記録更新')
                         .addFields(
-                            { name: 'ユーザーID', value: userId, inline: true },
-                            { name: '連続ログイン日数', value: `${newStreak} 日`, inline: true },
+                            { name: 'ユーザーID', value: `\`${userId}\``, inline: true },
+                            { name: '連続ログイン日数', value: `**${newStreak} 日**`, inline: true }
                         )
                         .setColor(0x00BFFF)
+                        .setThumbnail(message.author.displayAvatarURL({ dynamic: true, size: 128 }))
                         .setTimestamp();
-
-                    logger.info(`✅ ${message.author.tag} のログイン記録を更新: ${newStreak}日目`);
 
                     try {
                         const sentMsg = await message.channel.send({ embeds: [embed] });
                         await sentMsg.react('🗑️');
+                        await addMessageId(sentMsg.id);
                     } catch (e) {
                         logger.warn('ログイン通知送信エラー:', e);
                     }

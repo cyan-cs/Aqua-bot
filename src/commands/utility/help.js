@@ -10,7 +10,7 @@ module.exports = {
 
         const embed = new EmbedBuilder()
             .setColor(0x0099ff)
-            .setTitle('まかろに-help')
+            .setTitle('Cyan-help')
             .setDescription(`コマンド一覧: [GitHub](${readmeUrl}) \n サポート鯖: [ぱすた](${supportServerUrl})`)
             .setFooter({
                 text: `実行者: ${interaction.user.tag}`,

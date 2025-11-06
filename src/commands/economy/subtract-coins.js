@@ -18,11 +18,11 @@ module.exports = {
                 .setRequired(true)
         ),
     async executeSlash(interaction) {
-        const ownerId = process.env.OWNER_ID;
+        const ownerId = process.env.OWNER_ID.split(',') || [];
         const senderId = interaction.user.id;
 
         // 管理者専用コマンドの確認
-        if (senderId !== ownerId) {
+        if (ownerId.includes(senderId) === false) {
             return interaction.reply({ content: 'このコマンドを使用する権限がありません。', flags: MessageFlags.Ephemeral });
         }
 

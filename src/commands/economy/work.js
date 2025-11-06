@@ -5,7 +5,7 @@ const db = require('../../utils/database.js');
 const logger = require('../../utils/logger.js');
 
 const WORK_TABLE = 'work_log';
-const WORK_COOLDOWN = 60 * 60 * 1000; // 1時間
+const WORK_COOLDOWN = 60 * 60 * 1000;
 const WORK_REWARD_MIN = 100;
 const WORK_REWARD_MAX = 400;
 
@@ -22,6 +22,7 @@ module.exports = {
         try {
             const lastWorkTime = await getLastWorkTime(userId);
 
+            // クールダウン中
             if (lastWorkTime && now - lastWorkTime < WORK_COOLDOWN) {
                 const remainingMs = WORK_COOLDOWN - (now - lastWorkTime);
                 const remainingMin = Math.floor(remainingMs / 1000 / 60);
@@ -37,11 +38,12 @@ module.exports = {
                 return await replyMethod({ embeds: [embed] });
             }
 
+            // 報酬を計算
             const reward = getRandomReward();
             await economy.addBalance(userId, reward);
             await upsertWorkLog(userId, now);
 
-            logger.info(`Work command success for user ${userId}, reward: ${reward}`);
+            logger.info(`Work command success for user ${userId}, reward: ${reward}${MONEY_UNIT}`);
 
             const embed = new EmbedBuilder()
                 .setTitle('💼 仕事完了！')
@@ -52,11 +54,11 @@ module.exports = {
 
             return await replyMethod({ embeds: [embed] });
         } catch (err) {
-            logger.error('Error in /work command:', err);
+            logger.error(`Error in /work command for user ${userId}:`, err);
 
             const embed = new EmbedBuilder()
                 .setTitle('⚠️ エラー発生')
-                .setDescription(`コマンドの実行中にエラーが発生しました。`)
+                .setDescription('コマンドの実行中にエラーが発生しました。')
                 .addFields({ name: '詳細', value: `\`${err.message}\`` })
                 .setColor(0xFF0000)
                 .setTimestamp();

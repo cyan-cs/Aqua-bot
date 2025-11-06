@@ -1,11 +1,24 @@
-// src/index.js
 require('dotenv').config();
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { SimpleShardingStrategy } = require('@discordjs/ws'); // 追加
 const fs = require('fs');
 const path = require('path');
 const logger = require('./utils/logger.js');
 
 let client = null;
+
+// モバイル偽装用のカスタムシャーディング戦略クラス
+class MobileSimpleShardingStrategy extends SimpleShardingStrategy {
+    constructor(manager) {
+        // Identifyプロパティをモバイル(iOS)に偽装
+        manager.options.identifyProperties = {
+            os: 'ios',
+            browser: 'Discord iOS',
+            device: 'iPhone'
+        };
+        super(manager);
+    }
+}
 
 function registerEventHandlers(client) {
     const eventsPath = path.join(__dirname, 'events');
@@ -55,7 +68,10 @@ async function startClient() {
             Partials.Message,
             Partials.Channel,
             Partials.Reaction
-        ]
+        ],
+        ws: {
+            buildStrategy: manager => new MobileSimpleShardingStrategy(manager) // ここでモバイル偽装を適用
+        }
     });
 
     try {
@@ -64,7 +80,7 @@ async function startClient() {
         logger.info(`✅ Bot にログインしました: ${client.user?.tag ?? '(不明なユーザー)'}`);
         return client;
     } catch (error) {
-        logger.error('❌ Bot 起動時にエラーが発生しました:', error.message);
+        logger.error('❌ Bot 起動時にエラーが発生しました:', error);
         client = null;
         return null; // プロセスを落とさない
     }
@@ -80,7 +96,7 @@ async function stopClient() {
         await client.destroy();
         logger.info('🛑 Bot を停止しました。');
     } catch (error) {
-        logger.error('❌ Bot 停止時にエラーが発生しました:', error.message);
+        logger.error('❌ Bot 停止時にエラーが発生しました:', error);
     } finally {
         client = null;
     }

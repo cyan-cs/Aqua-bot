@@ -5,25 +5,15 @@ const path = require('path');
 const fs = require('fs');
 
 const prefix = '.';
+
 const commandCache = new Map();
 
-/**
- * コマンド名またはエイリアスから実際のコマンド名を解決する
- * @param {string} inputName 
- * @returns {string}
- */
 function resolveCommandName(inputName) {
     return Object.keys(aliases).find(cmd =>
         cmd === inputName || (Array.isArray(aliases[cmd]) && aliases[cmd].includes(inputName))
     ) || inputName;
 }
 
-/**
- * サブフォルダを含めてコマンドファイルを探索する
- * @param {string} baseDir
- * @param {string} commandName
- * @returns {string|null} コマンドファイルのパス
- */
 function findCommandFile(baseDir, commandName) {
     const entries = fs.readdirSync(baseDir, { withFileTypes: true });
     for (const entry of entries) {
@@ -61,10 +51,12 @@ module.exports = {
                     logger.warn(`Command module not found: ${resolvedName}`);
                     return;
                 }
+                // キャッシュクリア
+                delete require.cache[require.resolve(commandPath)];
                 command = require(commandPath);
                 commandCache.set(resolvedName, command);
             } catch (err) {
-                logger.warn(`Command module failed to load: ${resolvedName}`, err);
+                logger.error(`Command module failed to load: ${resolvedName}: ${err.stack || err}`);
                 return;
             }
         }
@@ -87,13 +79,13 @@ module.exports = {
         try {
             await command.executeMessage(message, ...args);
         } catch (error) {
-            logger.error(`Error executing command "${resolvedName}":`, error);
+            logger.error(`Error executing command "${resolvedName}": ${error.stack || error}`);
             try {
                 await message.reply({
                     content: 'コマンド実行中にエラーが発生しました。Bot管理者に連絡してください。',
                 });
             } catch (replyError) {
-                logger.error('Error sending error message to user:', replyError);
+                logger.error('Error sending error message to user:', replyError.stack || replyError);
             }
         }
     }

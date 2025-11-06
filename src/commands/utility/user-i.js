@@ -1,6 +1,6 @@
 const { GuildMember, EmbedBuilder, SlashCommandBuilder } = require('discord.js');
 const logger = require('../../utils/logger.js');
-const { addMessageId } = require('../../utils/jsonStore'); // 追加
+const { addMessageId } = require('../../utils/jsonStore');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -43,29 +43,31 @@ module.exports = {
                 );
             }
 
+            // おしゃれで見やすいEmbed
             const embed = new EmbedBuilder()
-                .setColor('#0099ff')
+                .setColor(0x00BFFF)
                 .setTitle(`${targetUser.tag} の情報`)
-                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true }))
+                .setThumbnail(targetUser.displayAvatarURL({ dynamic: true, size: 128 }))
                 .addFields(fields)
+                .setFooter({ text: 'ユーザー情報' })
                 .setTimestamp();
 
             logger.info(`User information for ${targetUser.tag} successfully retrieved.`);
 
-            const sentMsg = await replyMethod({ embeds: [embed], fetchReply: true }); // 重要：fetchReply有効
+            const sentMsg = await replyMethod({ embeds: [embed], fetchReply: true });
 
             await sentMsg.react('🗑️');
             await addMessageId(sentMsg.id);
 
         } catch (error) {
-            console.error('Error in /user-i command:', error);
             logger.error('Error executing /user-i command:', error);
 
             const embed = new EmbedBuilder()
-                .setColor('#FF0000')
-                .setTitle('⚠️ エラー発生')
+                .setColor(0xFF0000)
+                .setTitle('エラー発生')
                 .setDescription('コマンドの実行中にエラーが発生しました。')
                 .addFields({ name: '詳細', value: `\`${error.message}\`\n\`\`\`${error.stack}\`\`\`` })
+                .setFooter({ text: 'ユーザー情報取得失敗' })
                 .setTimestamp();
 
             const errorMsg = await replyMethod({ embeds: [embed], fetchReply: true });

@@ -1,19 +1,18 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const logger = require('../../utils/logger');
-const { addMessageId } = require('../../utils/jsonStore'); // 追加
+const { addMessageId } = require('../../utils/jsonStore');
 
 function createPingEmbed(ping, username) {
     const isError = ping === -1;
     const displayPing = isError ? '接続中 || 接続エラー' : `${ping}ms`;
+    const color = isError || ping > 3000 ? 0xFF0000 : 0x00BFFF; // 3秒以上は赤
 
-    const embed = new EmbedBuilder()
-        .setTitle('Pong!')
+    return new EmbedBuilder()
+        .setTitle('Pong! Bot 応答速度')
         .setDescription(`**WebSocket Ping:** \`${displayPing}\``)
-        .setColor(isError ? 0xFF0000 : 0x00BFFF)
-        .setTimestamp()
-        .setFooter({ text: `Requested by ${username}` });
-
-    return embed;
+        .setColor(color)
+        .setFooter({ text: `Requested by ${username}` })
+        .setTimestamp();
 }
 
 module.exports = {
@@ -22,38 +21,73 @@ module.exports = {
         .setDescription('Botの応答速度を確認します'),
 
     async executeSlash(interaction, client) {
-        const ping = client.ws.ping;
         const username = interaction.user.tag;
+        const placeholderEmbed = new EmbedBuilder()
+            .setTitle('Pong!')
+            .setColor(0x00BFFF)
+            .setFooter({ text: `Requested by ${username}` })
+            .setTimestamp();
 
         try {
-            const embed = createPingEmbed(ping, username);
-            const sentMsg = await interaction.reply({ embeds: [embed], fetchReply: true });
+            // まず計測中メッセージを送信
+            const sentMsg = await interaction.reply({ embeds: [placeholderEmbed], fetchReply: true });
+            await sentMsg.react('🗑️');
+            await addMessageId(sentMsg.id);
 
-            await sentMsg.react('🗑️'); // 🗑️ リアクション
-            await addMessageId(sentMsg.id); // delMessage.json にID保存
+            const startTime = Date.now();
+            // WebSocket ping取得
+            const ping = client.ws.ping;
+            const endTime = Date.now();
+            const totalPing = endTime - startTime;
 
-            logger.info(`SlashCommand /ping 実行: ${username} | Ping=${ping}ms`);
+            // 計測結果でEmbedを作成して編集
+            const embed = createPingEmbed(totalPing, username);
+            await sentMsg.edit({ embeds: [embed] });
+
+            logger.info(`SlashCommand /ping 実行: ${username} | Ping=${totalPing}ms`);
         } catch (err) {
-            logger.error(`SlashCommand /ping エラー: ${err.message}`);
-            await interaction.reply({ content: '❌ エラーが発生しました。', ephemeral: true });
+            logger.error(`SlashCommand /ping エラー: ${err.message}`, err);
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('⚠️ エラー発生')
+                .setDescription('コマンドの実行中にエラーが発生しました。')
+                .setColor(0xFF0000)
+                .setTimestamp();
+            await interaction.editReply({ embeds: [errorEmbed] }).catch(() => {
+                interaction.reply({ content: '❌ エラーが発生しました。', ephemeral: true });
+            });
         }
     },
 
     async executeMessage(message, client) {
-        const ping = client.ws.ping;
         const username = message.author.tag;
+        const placeholderEmbed = new EmbedBuilder()
+            .setTitle('Pong!')
+            .setColor(0x00BFFF)
+            .setFooter({ text: `Requested by ${username}` })
+            .setTimestamp();
 
         try {
-            const embed = createPingEmbed(ping, username);
-            const sentMsg = await message.reply({ embeds: [embed] });
-
+            const sentMsg = await message.reply({ embeds: [placeholderEmbed] });
             await sentMsg.react('🗑️');
             await addMessageId(sentMsg.id);
 
-            logger.info(`PrefixCommand ping 実行: ${username} | Ping=${ping}ms`);
+            const startTime = Date.now();
+            const ping = client.ws.ping;
+            const endTime = Date.now();
+            const totalPing = endTime - startTime;
+
+            const embed = createPingEmbed(totalPing, username);
+            await sentMsg.edit({ embeds: [embed] });
+
+            logger.info(`PrefixCommand ping 実行: ${username} | Ping=${totalPing}ms`);
         } catch (err) {
-            logger.error(`PrefixCommand ping エラー: ${err.message}`);
-            await message.reply('❌ エラーが発生しました。');
+            logger.error(`PrefixCommand ping エラー: ${err.message}`, err);
+            const errorEmbed = new EmbedBuilder()
+                .setTitle('⚠️ エラー発生')
+                .setDescription('コマンドの実行中にエラーが発生しました。')
+                .setColor(0xFF0000)
+                .setTimestamp();
+            await message.reply({ embeds: [errorEmbed] });
         }
     }
 };

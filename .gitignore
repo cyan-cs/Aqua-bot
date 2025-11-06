@@ -1,0 +1,7 @@
+node_modules/
+.env
+logs/
+logs/all.log
+logs/error.log
+logs/debug.log
+data/

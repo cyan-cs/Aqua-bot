@@ -7,7 +7,7 @@ const getAsync = promisify(db.get.bind(db));
 const serializeAsync = (fn) => new Promise(resolve => db.serialize(() => fn(resolve)));
 
 const TABLE_NAME = 'economy';
-const MONEY_UNIT = 'Cyan coin';
+const MONEY_UNIT = 'P';
 const MESSAGE_REWARD = 10;
 const OMIKUJI_TABLE = 'omikuji_results';
 

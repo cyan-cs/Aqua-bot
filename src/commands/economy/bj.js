@@ -22,10 +22,16 @@ module.exports = {
     async executeSlash(interaction) {
         const userId = interaction.user.id;
         const rawBet = interaction.options.getString('bet').toLowerCase();
-        let balance = await economy.getBalance(userId);
-        let bet;
 
-        // 賭け金の解釈
+        let balance;
+        try {
+            balance = await economy.getBalance(userId);
+        } catch (err) {
+            logger.error('残高取得失敗:', err);
+            return interaction.reply({ content: '残高情報の取得に失敗しました。', ephemeral: true });
+        }
+
+        let bet;
         if (rawBet === 'all') {
             bet = balance;
         } else if (rawBet === 'half') {
@@ -44,9 +50,13 @@ module.exports = {
             return interaction.reply({ content: `残高が不足しています。現在の残高は ${balance}${MONEY_UNIT} です。`, ephemeral: true });
         }
 
-        await economy.subtractBalance(userId, bet);
+        try {
+            await economy.subtractBalance(userId, bet);
+        } catch (err) {
+            logger.error('賭け金減算失敗:', err);
+            return interaction.reply({ content: '賭け金の処理に失敗しました。', ephemeral: true });
+        }
 
-        // 初期デッキと手札
         const deck = createDeck();
         const playerHand = [drawCard(deck), drawCard(deck)];
         const dealerHand = [drawCard(deck), drawCard(deck)];
@@ -54,7 +64,20 @@ module.exports = {
         const embed = createGameEmbed(playerHand, dealerHand, false, bet);
         const row = createActionRow();
 
-        const message = await interaction.reply({ embeds: [embed], components: [row], fetchReply: true });
+        try {
+            await interaction.reply({ embeds: [embed], components: [row] });
+        } catch (err) {
+            logger.error('メッセージ送信失敗:', err);
+            return;
+        }
+
+        let message;
+        try {
+            message = await interaction.fetchReply();
+        } catch (err) {
+            logger.error('メッセージ取得失敗:', err);
+            return;
+        }
 
         const collector = message.createMessageComponentCollector({ time: 60000 });
 
@@ -73,7 +96,13 @@ module.exports = {
             }
 
             const updatedEmbed = createGameEmbed(playerHand, dealerHand, false, bet);
-            await buttonInteraction.update({ embeds: [updatedEmbed], components: [row] });
+            try {
+                await buttonInteraction.update({ embeds: [updatedEmbed], components: [row] });
+            } catch (err) {
+                logger.warn('ボタン更新失敗:', err);
+            }
+
+            console.log(`プレイヤーの手札: ${formatHand(playerHand)} 合計: ${calculateHandValue(playerHand)} ディーラーの手札: ${formatHand(dealerHand, true)} 合計: ${calculateHandValue(dealerHand)}`);
         });
 
         collector.on('end', async (_, reason) => {
@@ -81,11 +110,11 @@ module.exports = {
                 const playerValue = calculateHandValue(playerHand);
                 let dealerValue = calculateHandValue(dealerHand);
                 let result;
+                let reward = 0;
 
                 if (reason === 'bust') {
                     result = 'あなたはバーストしました！負けです。';
                 } else {
-                    // ディーラーは 17 以上になるまで引く
                     while (dealerValue < 17) {
                         dealerHand.push(drawCard(deck));
                         dealerValue = calculateHandValue(dealerHand);
@@ -93,10 +122,10 @@ module.exports = {
 
                     if (dealerValue > 21 || playerValue > dealerValue) {
                         result = 'おめでとうございます！あなたの勝ちです！';
-                        await economy.addBalance(userId, bet * 2);
+                        reward = bet * 2;
                     } else if (playerValue === dealerValue) {
                         result = '引き分けです！賭け金が返却されます。';
-                        await economy.addBalance(userId, bet);
+                        reward = bet;
                     } else {
                         result = '残念！あなたの負けです。';
                     }
@@ -104,9 +133,24 @@ module.exports = {
 
                 const finalEmbed = createGameEmbed(playerHand, dealerHand, true, bet);
                 finalEmbed.setFooter({ text: result });
-                await interaction.editReply({ embeds: [finalEmbed], components: [] });
+
+                await interaction.editReply({ embeds: [finalEmbed], components: [createDisabledActionRow()] });
+
+                if (reward > 0) {
+                    try {
+                        await economy.addBalance(userId, reward);
+                    } catch (e) {
+                        logger.error('報酬付与失敗:', e);
+                    }
+                }
+
             } catch (error) {
-                logger.error('BJゲーム終了時のエラー:', error);
+                logger.error('BJ終了処理失敗:', error);
+                try {
+                    await interaction.editReply({ content: 'ゲーム終了処理に失敗しました。', components: [] });
+                } catch (editErr) {
+                    logger.error('エラー時editReply失敗:', editErr);
+                }
             }
         });
     }
@@ -169,5 +213,12 @@ function createActionRow() {
     return new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('hit').setLabel('ヒット').setStyle(ButtonStyle.Primary),
         new ButtonBuilder().setCustomId('stand').setLabel('スタンド').setStyle(ButtonStyle.Secondary)
+    );
+}
+
+function createDisabledActionRow() {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('hit').setLabel('ヒット').setStyle(ButtonStyle.Primary).setDisabled(true),
+        new ButtonBuilder().setCustomId('stand').setLabel('スタンド').setStyle(ButtonStyle.Secondary).setDisabled(true)
     );
 }
